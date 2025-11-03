@@ -371,8 +371,8 @@ function renderProviderCard(r) {
 
 // --------------------------- Manifest & Config ------------------------------
 const manifest = {
-  id: "a1337user.debridio.multi",
-  version: "1.0.0",
+  id: "a1337user.statusio.multi",
+  version: "1.0.4",
   name: "Statusio",
   description: "Shows premium status & days remaining across multiple debrid providers.",
   resources: ["stream"],

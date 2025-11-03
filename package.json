@@ -1,0 +1,19 @@
+{
+  "name": "statusio",
+  "version": "1.0.0",
+  "description": "Statusio • Stremio add-on showing premium status & days remaining for Real-Debrid, AllDebrid, Premiumize, TorBox, and Debrid-Link.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "stremio-addon-sdk": "^1.6.13"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "A1337User",
+  "license": "MIT"
+}

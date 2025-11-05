@@ -7,7 +7,6 @@
 //   - package.json: { "type": "module", "scripts": { "start": "node index.js" } }
 //   - npm i stremio-addon-sdk node-fetch
 //   - Run locally:  npm start
-//   - Optional local env testing: set RD_TOKEN=XXXX && npm start
 //   - Manifest URL: http://127.0.0.1:7042/manifest.json
 // ============================================================================
 
@@ -31,6 +30,10 @@ try {
 // ----------------------------- Helpers -------------------------------------
 const MIN = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Solid divider line for stream card formatting
+const LINE =
+  "────────────────────────────────────────────────────────────────";
 
 const ceilDays = (ms) => Math.max(0, Math.ceil(ms / DAY_MS));
 const addMsToISO = (ms) => new Date(Date.now() + ms).toISOString();
@@ -70,13 +73,16 @@ const getCache = (key) => {
 
 // ----------------------------- QUOTES --------------------------------------
 
-// 14+ days (OK)
+// 14+ days (OK) — Work mode, smart/funny, short zingers
 const QUOTES_OK = [
+  // Work-while-watching (5)
   "Grind & binge",
   "Work n' watch",
   "Emails? Nah, episodes",
   "Multitask: cry + work",
   "Boss on mute, show on blast",
+
+  // Short zingers (10 micro, <34 chars)
   "Plot twist: me",
   "Popcorn is needed",
   "Sequel my life",
@@ -87,6 +93,8 @@ const QUOTES_OK = [
   "Villain = bills",
   "Dramatic sip",
   "Boom. Plot.",
+
+  // Smart/funny (15+ punchy bangers)
   "You earned ‘Next Ep’.",
   "Inbox zero, season one.",
   "Adulting with captions.",
@@ -100,10 +108,33 @@ const QUOTES_OK = [
   "Side quest: popcorn.",
   "Therapy, but with dragons.",
   "Stretch, sip, stream.",
-  "Zoom out, zone in."
+  "Zoom out, zone in.",
+  "One more can't hurt... right?",
+  "Doomscrolling, but make it TV",
+  "I wanna know what happens next!",
+  "Just one season. *Lies.*",
+  "Sleep is overrated.",
+  "Cliffhanger got me hostage",
+  "I can quit… after this arc",
+  "This is self-care (delulu)",
+  "Oops, next ep autoplays",
+  "Brain: just one more. *12 later*",
+  "Plot > rent > everything",
+  "We roll credits at 3AM",
+  "I live here now. Send help.",
+  "Let the credits roll… never",
+  "My cardio: skipping intros",
+  "Hydrate? I drink plot twists",
+  "Laundry can wait. Drama can’t",
+  "Toilet break = high risk",
+  "Remote > friends > family",
+  "Eyes square, vibes rectangle",
+  "Binge now, adult later",
+  "Spoilers are a hate crime",
+  "Ctrl+Z real life, pls"
 ];
 
-// 14 days or less (warning)
+// 14 days or less (warning) — funny/edgy nudge
 const QUOTES_WARN = [
   "Renew before cliffhanger.",
   "Cheaper than snacks.",
@@ -114,35 +145,73 @@ const QUOTES_WARN = [
   "Don’t pause the fun.",
   "Click. Renew. Continue.",
   "Keep calm, renew on.",
-  "Roll credits on worry."
+  "Roll credits on worry.",
+  "Pay up or plot twist: pain",
+  "Binge tax due, peasant",
+  "Wallet lighter, soul fuller",
+  "Renew or face the void",
+  "Card declined? Big sad",
+  "Couch demands tribute",
+  "Subscription > therapy",
+  "Click or cry at 99%",
+  "Renewal = plot armor",
+  "Don’t let the algorithm win"
 ];
 
-// 3 days or less (critical)
+// 3 days or less (critical) — urgent but still funny
 const QUOTES_CRIT = [
   "Boss fight: renewal.",
   "Renew soon, it's coming!",
   "Please renew soon...",
   "Your time is almost up!",
+  "Don't let it catch on",
   "Two taps, all vibes.",
   "Renew = peace unlocked.",
   "Don’t lose the finale.",
   "Almost out—top up.",
   "3…2…renew.",
   "Tiny bill, big joy.",
+  "Grab the lifeline.",
   "Save the weekend.",
-  "Clock’s loud. Renew."
+  "Clock’s loud. Renew.",
+  "Last ep loading… or not",
+  "Buffering fate. Renew.",
+  "Do it or doomscroll life",
+  "Finale blocked. Pay up.",
+  "Renew or rage quit",
+  "Plot armor expiring"
 ];
 
-// 0 or less (expired)
+// 0 or less (expired) — roast mode ON
 const QUOTES_EXPIRED = [
   "Renew ASAP or else...",
+  "Your ISP will be mad!",
+  "Renew now to avoid ISP Warnings",
+  "Renew subscription to continue",
+  "Renew to avoid confrontation",
+  "Renew now to continue",
+  "We're not responsible, renew.",
   "We pause respectfully.",
   "Refill the fun meter.",
   "Next ep awaits payment.",
   "Fix the sub, then binge.",
   "Snack break until renew.",
   "Epic… after renewal.",
-  "Re-subscribe to continue."
+  "Re-subscribe to continue.",
+  "Broke hours activated",
+  "Screen black, dreams too",
+  "Renew or rot in reality",
+  "Buffering… forever",
+  "Cliffhanger hell awaits",
+  "Wallet betrayed you",
+  "Free trial? Cute story",
+  "Back to real life, sucka",
+  "Binge blocked. L.",
+  "Paywall won. You lost.",
+  "Subscription graveyard",
+  "Bills > chills > skills",
+  "Restart life.exe failed",
+  "You had one job: renew"
 ];
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -571,24 +640,24 @@ function renderProviderCard(r) {
   const title = `${titlePrefix} — ${service}`;
 
   const lines = [
-    "———————————————",
+    LINE,
     `🤝 Service: ${service}`,
     `👤 ${user}`,
     `⭐ Premium until: ${dateStr}`,
     `⏳ Days remaining: ${days} D`,
     `${mark}`,
     `💬 ${quote}`,
-    "———————————————"
+    LINE
   ].join("\n");
 
   return { title, description: lines };
 }
 
 // --------------------------- Manifest & Config ------------------------------
+// Sync version with your package.json (e.g. 1.1.0)
 const manifest = {
-  // ⚠ Change ID if you want Stremio to treat this as a fresh addon
-  id: "a1337user.statusio.multi.simple.v2",
-  version: "1.0.9",
+  id: "a1337user.statusio.multi.simple",
+  version: "1.1.0",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -597,34 +666,36 @@ const manifest = {
   catalogs: [],
   behaviorHints: { configurable: true, configurationRequired: false },
   logo: LOGO_DATA_URL || undefined,
+
+  // IMPORTANT: use "key", not "name", per Stremio manifest docs
   config: [
     {
-      name: "cache_minutes",
+      key: "cache_minutes",
       type: "number",
-      default: 45,
+      default: "45",
       title: "Cache Minutes (default 45)"
     },
 
     // Tokens / keys – presence = enabled
-    { name: "rd_token", type: "text", title: "Real-Debrid Token (Bearer)" },
-    { name: "ad_key", type: "text", title: "AllDebrid API Key (Bearer)" },
+    { key: "rd_token", type: "text", title: "Real-Debrid Token (Bearer)" },
+    { key: "ad_key", type: "text", title: "AllDebrid API Key (Bearer)" },
     {
-      name: "pm_key",
+      key: "pm_key",
       type: "text",
       title: "Premiumize apikey OR access_token"
     },
-    { name: "tb_token", type: "text", title: "TorBox Token (Bearer)" },
-    { name: "dl_key", type: "text", title: "Debrid-Link API Key/Token" },
+    { key: "tb_token", type: "text", title: "TorBox Token (Bearer)" },
+    { key: "dl_key", type: "text", title: "Debrid-Link API Key/Token" },
 
-    // Very simple extra text for Debrid-Link auth/endpoint
+    // Debrid-Link auth/endpoint
     {
-      name: "dl_auth",
+      key: "dl_auth",
       type: "text",
       title: "Debrid-Link Auth Scheme (Bearer/query)",
       default: "Bearer"
     },
     {
-      name: "dl_endpoint",
+      key: "dl_endpoint",
       type: "text",
       title: "Debrid-Link Endpoint Override",
       default: "https://debrid-link.com/api/account/infos"
@@ -636,27 +707,35 @@ const builder = new addonBuilder(manifest);
 
 // ---------------------------- Stream Handler -------------------------------
 builder.defineStreamHandler(async (args) => {
-  const cfg = args?.config || {};
-  console.log("[Statusio cfg]", JSON.stringify(cfg, null, 2));
+  // raw config from Stremio – may be an object OR a JSON string
+  const rawCfg = args?.config ?? {};
+  let cfg = {};
 
-  // Prefer CONFIG; fall back to env only if config key is empty
-  const rdFromCfg =
-    cfg.rd_token || cfg.RD_TOKEN || cfg.rdToken || cfg.realdebrid || "";
-  const adFromCfg = cfg.ad_key || cfg.AD_KEY || cfg.alldebrid || "";
-  const pmFromCfg = cfg.pm_key || cfg.PM_KEY || cfg.premiumize || "";
-  const tbFromCfg = cfg.tb_token || cfg.TB_TOKEN || cfg.torbox || "";
-  const dlFromCfg = cfg.dl_key || cfg.DL_KEY || cfg.debridlink || "";
+  if (typeof rawCfg === "string") {
+    try {
+      cfg = JSON.parse(rawCfg);
+    } catch (e) {
+      console.warn("[Statusio] Failed to parse args.config string:", e.message);
+      cfg = {};
+    }
+  } else if (typeof rawCfg === "object" && rawCfg !== null) {
+    cfg = rawCfg;
+  }
+
+  console.log("[Statusio raw config]", rawCfg);
+  console.log("[Statusio parsed config]", JSON.stringify(cfg, null, 2));
 
   const cacheMin = Number.isFinite(Number(cfg.cache_minutes))
     ? Math.max(1, Number(cfg.cache_minutes))
     : 45;
 
+  // Prefer config values; env vars only as fallback for dev
   const tokens = {
-    rd: String(rdFromCfg || process.env.RD_TOKEN || "").trim(),
-    ad: String(adFromCfg || process.env.AD_KEY || "").trim(),
-    pm: String(pmFromCfg || process.env.PM_KEY || "").trim(),
-    tb: String(tbFromCfg || process.env.TB_TOKEN || "").trim(),
-    dl: String(dlFromCfg || process.env.DL_KEY || "").trim()
+    rd: String(cfg.rd_token || process.env.RD_TOKEN || "").trim(),
+    ad: String(cfg.ad_key || process.env.AD_KEY || "").trim(),
+    pm: String(cfg.pm_key || process.env.PM_KEY || "").trim(),
+    tb: String(cfg.tb_token || process.env.TB_TOKEN || "").trim(),
+    dl: String(cfg.dl_key || process.env.DL_KEY || "").trim()
   };
 
   const enabled = {
@@ -695,7 +774,7 @@ builder.defineStreamHandler(async (args) => {
             key: tokens.pm,
             useOAuth:
               String(cfg.pm_auth || "").toLowerCase() === "oauth" ||
-              String(cfg.dl_auth || "").toLowerCase() === "oauth" // legacy fallback
+              String(cfg.dl_auth || "").toLowerCase() === "oauth"
           })
         );
       if (enabled.torbox) jobs.push(pTorBox({ token: tokens.tb }));
@@ -714,10 +793,10 @@ builder.defineStreamHandler(async (args) => {
       setCache(cacheKey, results, cacheMin * MIN);
     } catch (e) {
       const lines = [
-        "———————————————",
+        LINE,
         "⚠️ Unable to fetch debrid status",
         String(e.message || e),
-        "———————————————"
+        LINE
       ].join("\n");
       return {
         streams: [
@@ -746,33 +825,32 @@ builder.defineStreamHandler(async (args) => {
     });
   }
 
-  // If no providers enabled, show guidance / debug
   if (streams.length === 0) {
     const hasAnyCfg = Object.keys(cfg).length > 0;
+
     if (!hasAnyCfg) {
       streams.push({
         name: "🔐 Statusio",
         title: "⚠️ Add a token in Configure",
         description: [
-          "———————————————",
+          LINE,
           "Add at least one token in Configure:",
           "• Real-Debrid (rd_token)",
           "• AllDebrid (ad_key)",
           "• Premiumize (pm_key)",
           "• TorBox (tb_token)",
           "• Debrid-Link (dl_key)",
-          "———————————————"
+          LINE
         ].join("\n"),
         behaviorHints: { notWebReady: true },
         externalUrl: "about:blank"
       });
     } else {
-      // Debug card: helpful to verify if config actually arrived
       streams.push({
         name: "🔐 Statusio",
         title: "⚠️ Config received but no providers enabled",
         description: [
-          "———————————————",
+          LINE,
           "We received config from Stremio, but no provider token is enabled.",
           "",
           `Real-Debrid:   ${redact(tokens.rd)}`,
@@ -782,7 +860,7 @@ builder.defineStreamHandler(async (args) => {
           `Debrid-Link:   ${redact(tokens.dl)}`,
           "",
           "Check that your tokens are valid and saved in Configure.",
-          "———————————————"
+          LINE
         ].join("\n"),
         behaviorHints: { notWebReady: true },
         externalUrl: "about:blank"

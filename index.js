@@ -33,7 +33,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Solid divider line for stream card formatting
 const LINE =
-  "────────────────────────────────────────────────────────────────";
+  "────────────────";
 
 const ceilDays = (ms) => Math.max(0, Math.ceil(ms / DAY_MS));
 const addMsToISO = (ms) => new Date(Date.now() + ms).toISOString();
@@ -654,10 +654,10 @@ function renderProviderCard(r) {
 }
 
 // --------------------------- Manifest & Config ------------------------------
-// Sync version with your package.json (e.g. 1.1.1)
+// Sync version with your package.json (e.g. 1.1.2)
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.1",
+  version: "1.1.2",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",

@@ -245,7 +245,7 @@ set AD_KEY=abc && set PM_KEY=pm123 && node index.js
 
 **Expected titles / states**
 
-- ✅ **OK** — plenty of time left (≥ 15 days)
+- 🟢 **OK** — plenty of time left (≥ 15 days)
 
 - 🟡 **Warning** — **≤ 14 days**
 

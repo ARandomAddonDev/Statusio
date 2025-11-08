@@ -13,19 +13,10 @@
 import sdk from "stremio-addon-sdk";
 const { addonBuilder, serveHTTP } = sdk;
 import fetch from "node-fetch";
-import fs from "fs";
-import path from "path";
 
 // ----------------------------- Icon ----------------------------------------
-const logoPath = path.join(process.cwd(), "assets", "logo.png");
-let LOGO_DATA_URL = null;
-try {
-  const b64 = fs.readFileSync(logoPath).toString("base64");
-  LOGO_DATA_URL = `data:image/png;base64,${b64}`;
-  console.log("[logo] embedded from", logoPath);
-} catch (e) {
-  console.warn("[logo] could not read logo at", logoPath, e.message);
-}
+// Use hosted GitHub raw logo (requested)
+const LOGO_URL = "https://raw.githubusercontent.com/ARandomAddonDev/Statusio/refs/heads/main/assets/logo.png";
 
 // ----------------------------- Helpers -------------------------------------
 const MIN = 60 * 1000;
@@ -710,10 +701,10 @@ function buildExternalUrl(result, tokens) {
 }
 
 // --------------------------- Manifest & Config ------------------------------
-// v1.1.10 — no stream.type (for stricter clients), url+externalUrl
+// v1.1.11 — switch logo to GitHub raw URL; no stream.type (for stricter clients), url+externalUrl
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.10",
+  version: "1.1.11",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -728,7 +719,7 @@ const manifest = {
   idPrefixes: ["tt"],
   catalogs: [],
   behaviorHints: { configurable: true, configurationRequired: false },
-  logo: LOGO_DATA_URL || undefined,
+  logo: LOGO_URL,
 
   // Configurable fields (per docs: use "key")
   config: [

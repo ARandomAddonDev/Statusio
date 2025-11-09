@@ -1,6 +1,6 @@
 // ============================================================================
-// Statusio • Stremio Add-on (bare-bones TV test)
-// Providers: Real-Debrid, AllDebrid, Premiumize, TorBox, Debrid-Link
+// Statusio • Stremio Add-on (TV-Compatible Version)
+// Based on proven Ratings Aggregator pattern that works on Android TV/tvOS
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -8,34 +8,13 @@ const { addonBuilder, serveHTTP } = sdk;
 import fetch from "node-fetch";
 
 // ----------------------------- Icon ----------------------------------------
-// Use raw GitHub logo URL (no base64)
-const LOGO_DATA_URL = "https://raw.githubusercontent.com/ARandomAddonDev/Statusio/refs/heads/main/assets/logo.png";
+const LOGO_URL = "https://raw.githubusercontent.com/ARandomAddonDev/Statusio/refs/heads/main/assets/logo.png";
 
 // ----------------------------- Helpers -------------------------------------
 const MIN = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const STATUS_BASE_URL =
-  process.env.STATUS_BASE_URL || "https://statusio.elfhosted.com";
-
-const PROVIDER_URL = {
-  "Real-Debrid": "https://real-debrid.com/",
-  "TorBox": "https://torbox.app/",
-  "Premiumize": "https://www.premiumize.me/",
-  "AllDebrid": "https://alldebrid.com/",
-  "Debrid-Link": "https://debrid-link.com/"
-};
-
-const PROVIDER_PRIORITY = [
-  "Real-Debrid",
-  "TorBox",
-  "Premiumize",
-  "AllDebrid",
-  "Debrid-Link"
-];
-
 const ceilDays = (ms) => Math.max(0, Math.ceil(ms / DAY_MS));
-const addMsToISO = (ms) => new Date(Date.now() + ms).toISOString();
 const redact = (tok) =>
   tok ? `${String(tok).slice(0, 4)}…${String(tok).slice(-4)}` : "(none)";
 const isoDate = (iso) =>
@@ -53,7 +32,7 @@ function daysLeftFromDurationSec(durationSec) {
   const secs = Number(durationSec || 0);
   if (!Number.isFinite(secs) || secs <= 0) return { days: 0, untilISO: null };
   const ms = secs * 1000;
-  return { days: ceilDays(ms), untilISO: addMsToISO(ms) };
+  return { days: ceilDays(ms), untilISO: new Date(Date.now() + ms).toISOString() };
 }
 
 // Simple in-memory cache
@@ -71,43 +50,21 @@ const getCache = (key) => {
 };
 
 // --------------------------- Providers -------------------------------------
-// Each returns: { name, premium: true|false|null, daysLeft, untilISO, username?, note? }
-
 async function pRealDebrid({ token, fetchImpl = fetch }) {
   const name = "Real-Debrid";
-  if (!token)
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: "missing token"
-    };
+  if (!token) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "missing token" };
+  
   try {
     const res = await fetchImpl("https://api.real-debrid.com/rest/1.0/user", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "User-Agent": "Statusio/1.0"
-      }
+      headers: { Authorization: `Bearer ${token}`, "User-Agent": "Statusio/1.0" }
     });
-    if (!res.ok)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: `HTTP ${res.status}`
-      };
+    
+    if (!res.ok) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `HTTP ${res.status}` };
+    
     const j = await res.json();
-
     const username = j?.username || j?.user || null;
-    const premium =
-      j.premium === true ||
-      String(j.type || "").toLowerCase() === "premium";
-    let untilISO = null,
-      days = null;
+    const premium = j.premium === true || String(j.type || "").toLowerCase() === "premium";
+    let untilISO = null, days = null;
 
     if (j.expiration) {
       const expNum = Number(j.expiration);
@@ -130,424 +87,176 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
       untilISO = out.untilISO;
     }
 
-    if (premium === true)
-      return {
-        name,
-        premium: true,
-        daysLeft: days ?? null,
-        untilISO: untilISO ?? null,
-        username
-      };
-    if (premium === false)
-      return {
-        name,
-        premium: false,
-        daysLeft: 0,
-        untilISO: null,
-        username
-      };
-
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username,
-      note: "status unknown"
-    };
+    if (premium === true) return { name, premium: true, daysLeft: days ?? null, untilISO: untilISO ?? null, username };
+    if (premium === false) return { name, premium: false, daysLeft: 0, untilISO: null, username };
+    
+    return { name, premium: null, daysLeft: null, untilISO: null, username, note: "status unknown" };
   } catch (e) {
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: `network ${e.message}`
-    };
+    return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `network ${e.message}` };
   }
 }
 
 async function pAllDebrid({ key, fetchImpl = fetch }) {
   const name = "AllDebrid";
-  if (!key)
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: "missing key"
-    };
+  if (!key) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "missing key" };
+  
   try {
     const res = await fetchImpl("https://api.alldebrid.com/v4/user", {
       headers: { Authorization: `Bearer ${key}`, "User-Agent": "Statusio/1.0" }
     });
-    if (!res.ok)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: `HTTP ${res.status}`
-      };
+    
+    if (!res.ok) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `HTTP ${res.status}` };
+    
     const j = await res.json();
-    if (j?.status !== "success" || !j?.data?.user)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: "bad response"
-      };
+    if (j?.status !== "success" || !j?.data?.user) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "bad response" };
 
     const u = j.data.user;
     const username = u?.username || null;
     const isPrem = !!u.isPremium;
     let out = { days: null, untilISO: null };
-    if (
-      Number.isFinite(Number(u.premiumUntil)) &&
-      Number(u.premiumUntil) > 0
-    )
+    
+    if (Number.isFinite(Number(u.premiumUntil)) && Number(u.premiumUntil) > 0) {
       out = daysLeftFromEpochSec(Number(u.premiumUntil));
+    }
 
     return isPrem
-      ? {
-          name,
-          premium: true,
-          daysLeft: out.days,
-          untilISO: out.untilISO,
-          username
-        }
+      ? { name, premium: true, daysLeft: out.days, untilISO: out.untilISO, username }
       : { name, premium: false, daysLeft: 0, untilISO: null, username };
   } catch (e) {
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: `network ${e.message}`
-    };
+    return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `network ${e.message}` };
   }
 }
 
 async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
   const name = "Premiumize";
-  if (!key)
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: "missing key"
-    };
+  if (!key) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "missing key" };
+  
   try {
     const url = new URL("https://www.premiumize.me/api/account/info");
     url.searchParams.set(useOAuth ? "access_token" : "apikey", key);
-    const res = await fetchImpl(url.toString(), {
-      headers: { "User-Agent": "Statusio/1.0" }
-    });
-    if (!res.ok)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: `HTTP ${res.status}`
-      };
+    
+    const res = await fetchImpl(url.toString(), { headers: { "User-Agent": "Statusio/1.0" } });
+    
+    if (!res.ok) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `HTTP ${res.status}` };
+    
     const j = await res.json();
-    if (String(j.status).toLowerCase() !== "success")
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: "bad response"
-      };
+    if (String(j.status).toLowerCase() !== "success") return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "bad response" };
 
     const out = daysLeftFromEpochSec(j.premium_until || 0);
     const isPrem = out.days > 0;
     const username = j?.customer_id ? String(j.customer_id) : null;
 
     return isPrem
-      ? {
-          name,
-          premium: true,
-          daysLeft: out.days,
-          untilISO: out.untilISO,
-          username
-        }
+      ? { name, premium: true, daysLeft: out.days, untilISO: out.untilISO, username }
       : { name, premium: false, daysLeft: 0, untilISO: null, username };
   } catch (e) {
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: `network ${e.message}`
-    };
+    return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `network ${e.message}` };
   }
 }
 
 async function pTorBox({ token, fetchImpl = fetch }) {
   const name = "TorBox";
-  if (!token)
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: "missing token"
-    };
+  if (!token) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "missing token" };
+  
   try {
-    const res = await fetchImpl(
-      "https://api.torbox.app/v1/api/user/me?settings=true",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "User-Agent": "Statusio/1.0"
-        }
-      }
-    );
-    if (!res.ok)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: `HTTP ${res.status}`
-      };
+    const res = await fetchImpl("https://api.torbox.app/v1/api/user/me?settings=true", {
+      headers: { Authorization: `Bearer ${token}`, "User-Agent": "Statusio/1.0" }
+    });
+    
+    if (!res.ok) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `HTTP ${res.status}` };
+    
     const j = await res.json();
-
     const u = j?.data?.user || j?.user || j;
     const username = u?.username || null;
-    const isPrem =
-      u?.isPremium === true ||
-      String(u?.accountType ?? "").toLowerCase() === "premium";
+    const isPrem = u?.isPremium === true || String(u?.accountType ?? "").toLowerCase() === "premium";
     let out = { days: 0, untilISO: null };
 
-    if (u?.premiumUntil) out = daysLeftFromEpochSec(u.premiumUntil);
-    else if (
-      u?.premium_left ||
-      u?.premiumLeft ||
-      u?.remainingPremiumSeconds
-    ) {
-      out = daysLeftFromDurationSec(
-        u.premium_left || u.premiumLeft || u.remainingPremiumSeconds
-      );
+    if (u?.premiumUntil) {
+      out = daysLeftFromEpochSec(u.premiumUntil);
+    } else if (u?.premium_left || u?.premiumLeft || u?.remainingPremiumSeconds) {
+      out = daysLeftFromDurationSec(u.premium_left || u.premiumLeft || u.remainingPremiumSeconds);
     }
 
-    if (isPrem)
-      return {
-        name,
-        premium: true,
-        daysLeft: out.days || null,
-        untilISO: out.untilISO,
-        username
-      };
-    if (out.days > 0)
-      return {
-        name,
-        premium: true,
-        daysLeft: out.days,
-        untilISO: out.untilISO,
-        username
-      };
-
-    return {
-      name,
-      premium: false,
-      daysLeft: 0,
-      untilISO: null,
-      username,
-      note: u?.note || undefined
-    };
+    if (isPrem) return { name, premium: true, daysLeft: out.days || null, untilISO: out.untilISO, username };
+    if (out.days > 0) return { name, premium: true, daysLeft: out.days, untilISO: out.untilISO, username };
+    
+    return { name, premium: false, daysLeft: 0, untilISO: null, username, note: u?.note || undefined };
   } catch (e) {
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: `network ${e.message}`
-    };
+    return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `network ${e.message}` };
   }
 }
 
-async function pDebridLink({
-  key,
-  authScheme = "Bearer",
-  endpoint = "https://debrid-link.com/api/account/infos",
-  fetchImpl = fetch
-}) {
+async function pDebridLink({ key, authScheme = "Bearer", endpoint = "https://debrid-link.com/api/account/infos", fetchImpl = fetch }) {
   const name = "Debrid-Link";
-  if (!key)
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: "missing key"
-    };
+  if (!key) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "missing key" };
+  
   try {
     let url = endpoint;
     const init = { headers: { "User-Agent": "Statusio/1.0" } };
 
-    if (authScheme === "Bearer") init.headers.Authorization = `Bearer ${key}`;
-    else {
+    if (authScheme === "Bearer") {
+      init.headers.Authorization = `Bearer ${key}`;
+    } else {
       const u = new URL(endpoint);
       u.searchParams.set("apikey", key);
       url = u.toString();
     }
 
     const res = await fetchImpl(url, init);
-    if (!res.ok)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: `HTTP ${res.status}`
-      };
+    if (!res.ok) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `HTTP ${res.status}` };
+    
     const j = await res.json();
-    if (!j?.success || !j?.value)
-      return {
-        name,
-        premium: null,
-        daysLeft: null,
-        untilISO: null,
-        username: null,
-        note: "bad response"
-      };
+    if (!j?.success || !j?.value) return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: "bad response" };
 
     const secs = Number(j.value.premiumLeft || 0);
-    const out =
-      secs > 0 ? daysLeftFromDurationSec(secs) : { days: 0, untilISO: null };
+    const out = secs > 0 ? daysLeftFromDurationSec(secs) : { days: 0, untilISO: null };
     const username = j?.value?.username || null;
 
-    if (out.days > 0)
-      return {
-        name,
-        premium: true,
-        daysLeft: out.days,
-        untilISO: out.untilISO,
-        username
-      };
-    return {
-      name,
-      premium: false,
-      daysLeft: 0,
-      untilISO: null,
-      username,
-      note: `accountType=${j.value.accountType ?? "?"}`
-    };
+    if (out.days > 0) return { name, premium: true, daysLeft: out.days, untilISO: out.untilISO, username };
+    
+    return { name, premium: false, daysLeft: 0, untilISO: null, username, note: `accountType=${j.value.accountType ?? "?"}` };
   } catch (e) {
-    return {
-      name,
-      premium: null,
-      daysLeft: null,
-      untilISO: null,
-      username: null,
-      note: `network ${e.message}`
-    };
+    return { name, premium: null, daysLeft: null, untilISO: null, username: null, note: `network ${e.message}` };
   }
 }
 
-// --------------------------- Status + rendering ----------------------------
-
-function statusWord(days) {
-  if (days <= 0) return "Expired";
-  if (days <= 3) return "Critical";
-  if (days <= 14) return "Warning";
-  return "OK";
+// --------------------------- Status Formatting -----------------------------
+function getStatusInfo(days) {
+  if (days <= 0) return { emoji: "🔴", status: "EXPIRED" };
+  if (days <= 3) return { emoji: "🟠", status: "CRITICAL" };
+  if (days <= 14) return { emoji: "🟡", status: "WARNING" };
+  return { emoji: "🟢", status: "OK" };
 }
 
-// Make a very simple card like the screenshot
-function renderBareCard(result) {
-  const service = result.name;
-  const username = result?.username ? String(result.username) : "N/A";
+// SIMPLIFIED FORMATTING - Like Ratings Aggregator
+function formatProviderStatus(r) {
+  const user = r?.username ? `@${String(r.username)}` : "—";
+  const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null ? r.daysLeft : r.premium ? "—" : 0;
+  const dateStr = r.untilISO ? isoDate(r.untilISO) : r.premium ? "—" : "N/A";
 
-  const days =
-    Number.isFinite(result.daysLeft) && result.daysLeft !== null
-      ? result.daysLeft
-      : result.premium
-      ? "—"
-      : 0;
+  const numericDays = typeof days === "number" ? days : 9999;
+  const { emoji, status } = getStatusInfo(numericDays);
 
-  const numericDays = typeof days === "number" ? days : 0;
-  const dateStr = result.untilISO ? isoDate(result.untilISO) : "N/A";
-
-  const word = statusWord(numericDays);
-
-  const title = `${service}: ${word}`;
-  const descriptionLines = [
-    `User: ${username}`,
-    `Expires: ${dateStr}`,
-    `Days left: ${numericDays}`
-  ];
-
-  return {
-    title,
-    description: descriptionLines.join("\n")
-  };
+  return `${emoji} ${r.name}: ${status}\nUser: ${user}\nExpires: ${dateStr}\nDays left: ${days}${r.note ? `\nNote: ${r.note}` : ''}`;
 }
 
-// Build a simple external link (used only as URL)
-function buildExternalUrl(result, tokens) {
-  try {
-    if (result?.name && PROVIDER_URL[result.name]) {
-      return PROVIDER_URL[result.name];
-    }
-
-    for (const prov of PROVIDER_PRIORITY) {
-      if (
-        (prov === "Real-Debrid" && tokens.rd) ||
-        (prov === "TorBox" && tokens.tb) ||
-        (prov === "Premiumize" && tokens.pm) ||
-        (prov === "AllDebrid" && tokens.ad) ||
-        (prov === "Debrid-Link" && tokens.dl)
-      ) {
-        return PROVIDER_URL[prov] || STATUS_BASE_URL;
-      }
-    }
-
-    return STATUS_BASE_URL;
-  } catch (e) {
-    console.warn("[Statusio] Failed to build URL:", e.message);
-    return STATUS_BASE_URL;
-  }
-}
-
-// --------------------------- Manifest & Config ------------------------------
-// v1.1.13 — Bare-bones layout for TV clients
+// --------------------------- Manifest (TV-Compatible) ---------------------
 const manifest = {
-  id: "a1337user.statusio.multi.simple",
-  version: "1.1.13",
+  id: "a1337user.statusio.tv.compatible",
+  version: "1.1.14",
   name: "Statusio",
-  description:
-    "Shows premium status & days remaining across multiple debrid providers.",
-  resources: [
-    {
-      name: "stream",
-      types: ["movie", "series"],
-      idPrefixes: ["tt"]
-    }
-  ],
+  description: "Shows premium status & days remaining across multiple debrid providers.",
+  
+  // EXACTLY like Ratings Aggregator
+  resources: ["stream"],
   types: ["movie", "series"],
   idPrefixes: ["tt"],
   catalogs: [],
-  behaviorHints: { configurable: true, configurationRequired: false },
-  logo: LOGO_DATA_URL,
+  behaviorHints: {
+    configurable: true,
+    configurationRequired: false,
+  },
+  logo: LOGO_URL,
 
   config: [
     {
@@ -556,17 +265,11 @@ const manifest = {
       default: "45",
       title: "Cache Minutes (default 45)"
     },
-
     { key: "rd_token", type: "text", title: "Real-Debrid Token (Bearer)" },
     { key: "ad_key", type: "text", title: "AllDebrid API Key (Bearer)" },
-    {
-      key: "pm_key",
-      type: "text",
-      title: "Premiumize apikey OR access_token"
-    },
+    { key: "pm_key", type: "text", title: "Premiumize apikey OR access_token" },
     { key: "tb_token", type: "text", title: "TorBox Token (Bearer)" },
     { key: "dl_key", type: "text", title: "Debrid-Link API Key/Token" },
-
     {
       key: "dl_auth",
       type: "text",
@@ -584,33 +287,9 @@ const manifest = {
 
 const builder = new addonBuilder(manifest);
 
-// ---------------------------- Stream Handler -------------------------------
-builder.defineStreamHandler(async (args) => {
-  const reqType = String(args?.type || "");
-  const reqId = String(args?.id || "");
-  console.log("[Statusio] stream request:", { type: reqType, id: reqId });
-  if (!reqId || !reqId.startsWith("tt")) {
-    return { streams: [] };
-  }
-
-  const rawCfg = args?.config ?? {};
-  let cfg = {};
-  if (typeof rawCfg === "string") {
-    try {
-      cfg = JSON.parse(rawCfg);
-    } catch (e) {
-      console.warn("[Statusio] Failed to parse args.config string:", e.message);
-      cfg = {};
-    }
-  } else if (typeof rawCfg === "object" && rawCfg !== null) {
-    cfg = rawCfg;
-  }
-
-  console.log("[Statusio parsed config]", JSON.stringify(cfg, null, 2));
-
-  const cacheMin = Number.isFinite(Number(cfg.cache_minutes))
-    ? Math.max(1, Number(cfg.cache_minutes))
-    : 45;
+// --------------------------- Shared Data Fetching --------------------------
+async function fetchStatusData(cfg) {
+  const cacheMin = Number.isFinite(Number(cfg.cache_minutes)) ? Math.max(1, Number(cfg.cache_minutes)) : 45;
 
   const tokens = {
     rd: String(cfg.rd_token || process.env.RD_TOKEN || "").trim(),
@@ -628,13 +307,8 @@ builder.defineStreamHandler(async (args) => {
     debridlink: !!tokens.dl
   };
 
-  console.log("[Statusio enabled]", enabled);
-
   const cacheKey = [
-    Object.entries(enabled)
-      .filter(([, v]) => v)
-      .map(([k]) => k)
-      .join(","),
+    Object.entries(enabled).filter(([, v]) => v).map(([k]) => k).join(","),
     `rd:${redact(tokens.rd)}`,
     `ad:${redact(tokens.ad)}`,
     `pm:${redact(tokens.pm)}`,
@@ -643,102 +317,96 @@ builder.defineStreamHandler(async (args) => {
   ].join("|");
 
   let results = getCache(cacheKey);
+  
   if (!results) {
     try {
       const jobs = [];
       if (enabled.realdebrid) jobs.push(pRealDebrid({ token: tokens.rd }));
       if (enabled.alldebrid) jobs.push(pAllDebrid({ key: tokens.ad }));
-      if (enabled.premiumize)
-        jobs.push(
-          pPremiumize({
-            key: tokens.pm,
-            useOAuth:
-              String(cfg.pm_auth || "").toLowerCase() === "oauth" ||
-              String(cfg.dl_auth || "").toLowerCase() === "oauth"
-          })
-        );
+      if (enabled.premiumize) jobs.push(pPremiumize({ key: tokens.pm }));
       if (enabled.torbox) jobs.push(pTorBox({ token: tokens.tb }));
-      if (enabled.debridlink)
-        jobs.push(
-          pDebridLink({
-            key: tokens.dl,
-            authScheme: cfg.dl_auth || "Bearer",
-            endpoint:
-              (cfg.dl_endpoint || "https://debrid-link.com/api/account/infos").trim()
-          })
-        );
+      if (enabled.debridlink) jobs.push(pDebridLink({
+        key: tokens.dl,
+        authScheme: cfg.dl_auth || "Bearer",
+        endpoint: (cfg.dl_endpoint || "https://debrid-link.com/api/account/infos").trim()
+      }));
 
       results = jobs.length ? await Promise.all(jobs) : [];
       setCache(cacheKey, results, cacheMin * MIN);
     } catch (e) {
-      const fallbackLink = STATUS_BASE_URL;
-      const desc = `Unable to fetch debrid status:\n${String(e.message || e)}`;
-
-      return {
-        streams: [
-          {
-            name: "Statusio",
-            title: "Status unavailable",
-            description: desc,
-            url: fallbackLink
-          }
-        ],
-        cacheMaxAge: 60
-      };
+      console.error("[Statusio] Error fetching provider data:", e);
+      return { error: e.message, results: [] };
     }
+  }
+
+  return { results, enabled, hasData: results.some(r => r.premium !== null || r.username) };
+}
+
+// ---------------------------- Stream Handler (TV-Compatible) ---------------
+builder.defineStreamHandler(async (args) => {
+  const reqType = String(args?.type || "");
+  const reqId = String(args?.id || "");
+  
+  console.log("[Statusio] TV stream request:", { type: reqType, id: reqId });
+
+  if (!reqId || !reqId.startsWith("tt")) {
+    return { streams: [] };
+  }
+
+  // Parse config
+  const rawCfg = args?.config ?? {};
+  let cfg = {};
+  if (typeof rawCfg === "string") {
+    try { cfg = JSON.parse(rawCfg); } catch (e) { cfg = {}; }
+  } else if (typeof rawCfg === "object" && rawCfg !== null) {
+    cfg = rawCfg;
+  }
+
+  console.log("[Statusio parsed config]", JSON.stringify(cfg, null, 2));
+
+  const statusData = await fetchStatusData(cfg);
+  
+  // If no providers configured, return empty (TVs don't like setup streams)
+  if (!Object.values(statusData.enabled).some(v => v)) {
+    console.log("[Statusio] No providers enabled, returning empty for TV");
+    return { streams: [] };
   }
 
   const streams = [];
-  for (const r of results) {
-    const card = renderBareCard(r);
-    const link = buildExternalUrl(r, tokens);
 
-    streams.push({
-      name: "Statusio",
-      title: card.title,
-      description: card.description,
-      url: link
-    });
-  }
-
-  if (streams.length === 0) {
-    const hasAnyCfg = Object.keys(cfg).length > 0;
-    const fallbackLink = STATUS_BASE_URL;
-
-    if (!hasAnyCfg) {
-      streams.push({
-        name: "Statusio",
-        title: "No providers configured",
-        description:
-          "Add at least one token in Configure:\nReal-Debrid, AllDebrid, Premiumize, TorBox or Debrid-Link.",
-        url: fallbackLink
-      });
-    } else {
-      streams.push({
-        name: "Statusio",
-        title: "Config received but no providers enabled",
-        description: [
-          `Real-Debrid:   ${redact(tokens.rd)}`,
-          `AllDebrid:     ${redact(tokens.ad)}`,
-          `Premiumize:    ${redact(tokens.pm)}`,
-          `TorBox:        ${redact(tokens.tb)}`,
-          `Debrid-Link:   ${redact(tokens.dl)}`
-        ].join("\n"),
-        url: fallbackLink
-      });
+  // Create TV-compatible streams - SIMPLE like Ratings Aggregator
+  if (statusData.hasData) {
+    for (const r of statusData.results) {
+      if (r.premium !== null || r.username) {
+        const { emoji, status } = getStatusInfo(typeof r.daysLeft === 'number' ? r.daysLeft : 9999);
+        
+        // EXACTLY like Ratings Aggregator pattern
+        streams.push({
+          name: "🔐 Statusio", // Fixed name like "🎯 Ratings Aggregator"
+          description: formatProviderStatus(r),
+          // CRITICAL: Must include URL field (use provider homepage)
+          url: "https://real-debrid.com/",
+          externalUrl: "https://real-debrid.com/",
+          behaviorHints: {
+            notWebReady: true
+            // bingeGroup: `statusio-${r.name.toLowerCase()}`
+          }
+        });
+      }
     }
   }
 
-  return {
-    streams,
-    cacheMaxAge: cacheMin * 60,
-    staleRevalidate: cacheMin * 60,
-    staleError: cacheMin * 60
-  };
+  // If multiple providers, only return ONE stream to avoid TV issues
+  const finalStreams = streams.length > 0 ? [streams[0]] : [];
+  
+  console.log(`[Statusio] Returning ${finalStreams.length} TV-compatible streams`);
+  return { streams: finalStreams };
 });
 
 // ------------------------------ Server -------------------------------------
 const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
-console.log(`Statusio at http://127.0.0.1:${PORT}/manifest.json`);
+console.log(`✅ Statusio TV Compatible at http://127.0.0.1:${PORT}/manifest.json`);
+console.log(`📱 Uses proven Ratings Aggregator pattern`);
+console.log(`🎯 Test: Go to any movie/series and check streams`);

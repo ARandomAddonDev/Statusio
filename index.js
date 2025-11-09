@@ -1,13 +1,6 @@
 // ============================================================================
-// Statusio • Stremio Add-on (info-only stream cards, one per provider)
+// Statusio • Stremio Add-on (bare-bones TV test)
 // Providers: Real-Debrid, AllDebrid, Premiumize, TorBox, Debrid-Link
-// Features: Per-provider tokens via Configure, caching, logo in manifest
-//
-// Node setup:
-//   - package.json: { "type": "module", "scripts": { "start": "node index.js" } }
-//   - npm i stremio-addon-sdk node-fetch
-//   - Run locally:  npm start
-//   - Manifest URL: http://127.0.0.1:7042/manifest.json
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -15,22 +8,16 @@ const { addonBuilder, serveHTTP } = sdk;
 import fetch from "node-fetch";
 
 // ----------------------------- Icon ----------------------------------------
-// v1.1.12 – use hosted logo URL (no base64 embedding)
-const LOGO_URL =
-  "https://raw.githubusercontent.com/ARandomAddonDev/Statusio/refs/heads/main/assets/logo.png";
+// Use raw GitHub logo URL (no base64)
+const LOGO_DATA_URL = "https://raw.githubusercontent.com/ARandomAddonDev/Statusio/refs/heads/main/assets/logo.png";
 
 // ----------------------------- Helpers -------------------------------------
 const MIN = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Solid divider line for stream card formatting
-const LINE = "────────────────";
-
-// Base URL for external link (hosted Statusio UI) — kept for future use
 const STATUS_BASE_URL =
   process.env.STATUS_BASE_URL || "https://statusio.elfhosted.com";
 
-// Provider website homepages (for smart routing)
 const PROVIDER_URL = {
   "Real-Debrid": "https://real-debrid.com/",
   "TorBox": "https://torbox.app/",
@@ -39,7 +26,6 @@ const PROVIDER_URL = {
   "Debrid-Link": "https://debrid-link.com/"
 };
 
-// Priority fallback when multiple tokens exist but result has no name
 const PROVIDER_PRIORITY = [
   "Real-Debrid",
   "TorBox",
@@ -83,145 +69,6 @@ const getCache = (key) => {
   }
   return it.value;
 };
-
-// ----------------------------- QUOTES --------------------------------------
-
-// 14+ days (OK) — Work mode, smart/funny, short zingers
-const QUOTES_OK = [
-  "Grind & binge",
-  "Work n' watch",
-  "Emails? Nah, episodes",
-  "Multitask: cry + work",
-  "Boss muted, show blasted",
-  "Plot twist: me",
-  "Popcorn is needed",
-  "Sequel my life",
-  "Cue the chaos",
-  "Credits? Nope. Next.",
-  "Plot armor ON",
-  "Spoiler: snacks",
-  "Villain = bills",
-  "Dramatic sip",
-  "Boom. Plot.",
-  "You earned ‘Next Ep’.",
-  "Inbox zero, season one.",
-  "Adulting with captions.",
-  "Procrastinatw: cinematic",
-  "Budget: snacks approved.",
-  "Tonight’s plan: stay.",
-  "Your couch filed PTO.",
-  "Microwave = trailer time",
-  "Main quest: relax.",
-  "Side quest: popcorn.",
-  "Therapy but with dragons",
-  "Stretch, sip, stream.",
-  "Zoom out, zone in.",
-  "One more can't hurt, right?",
-  "Doomscrolling, but make it TV",
-  "I wanna know what happens next!",
-  "Just one season. *Lies.*",
-  "Sleep is overrated.",
-  "Cliffhanger got me hostage",
-  "I can quit… after this arc",
-  "This is self-care (delulu)",
-  "Oops, next ep autoplays",
-  "Brain: just one more. *12 later*",
-  "Plot > rent > everything",
-  "We roll credits at 3AM",
-  "I live here now. Send help.",
-  "Let the credits roll… never",
-  "My cardio: skipping intros",
-  "Hydrate? I drink plot twists",
-  "Laundry can wait. Drama can’t",
-  "Toilet break = high risk",
-  "Remote > friends > family",
-  "Eyes square, vibes rectangle",
-  "Binge now, adult later",
-  "Spoilers are a hate crime",
-  "Ctrl+Z real life, pls"
-];
-
-// 14 days or less (warning)
-const QUOTES_WARN = [
-  "Renew before cliffhanger.",
-  "Cheaper than snacks.",
-  "Tiny fee, huge chill.",
-  "Beat the ‘oops, expired’.",
-  "Your future self says thanks.",
-  "Renew now, binge later.",
-  "Don’t pause the fun.",
-  "Click. Renew. Continue.",
-  "Keep calm, renew on.",
-  "Roll credits on worry.",
-  "Pay up or plot twist: pain",
-  "Binge tax due, peasant",
-  "Wallet lighter, soul fuller",
-  "Renew or face the void",
-  "Card declined? Big sad",
-  "Couch demands tribute",
-  "Subscription > therapy",
-  "Click or cry at 99%",
-  "Renewal = plot armor",
-  "Don’t let the algorithm win"
-];
-
-// 3 days or less (critical)
-const QUOTES_CRIT = [
-  "Boss fight: renewal.",
-  "Renew soon, it's coming!",
-  "Please renew soon...",
-  "Your time is almost up!",
-  "Don't let it catch on",
-  "Two taps, all vibes.",
-  "Renew = peace unlocked.",
-  "Don’t lose the finale.",
-  "Almost out—top up.",
-  "3…2…renew.",
-  "Tiny bill, big joy.",
-  "Grab the lifeline.",
-  "Save the weekend.",
-  "Clock’s loud. Renew.",
-  "Last ep loading… or not",
-  "Buffering fate. Renew.",
-  "Do it or doomscroll life",
-  "Finale blocked. Pay up.",
-  "Renew or rage quit",
-  "Plot armor expiring"
-];
-
-// 0 or less (expired)
-const QUOTES_EXPIRED = [
-  "Renew ASAP or else...",
-  "Your ISP will be mad!",
-  "Renew now to avoid ISP Warnings",
-  "Renew subscription to continue",
-  "Renew to avoid confrontation",
-  "Renew now to continue",
-  "We're not responsible, renew.",
-  "We pause respectfully.",
-  "Refill the fun meter.",
-  "Next ep awaits payment.",
-  "Fix the sub, then binge.",
-  "Snack break until renew.",
-  "Epic… after renewal.",
-  "Re-subscribe to continue.",
-  "Broke hours activated",
-  "Screen black, dreams too",
-  "Renew or rot in reality",
-  "Buffering… forever",
-  "Cliffhanger hell awaits",
-  "Wallet betrayed you",
-  "Free trial? Cute story",
-  "Back to real life, sucka",
-  "Binge blocked. L.",
-  "Paywall won. You lost.",
-  "Subscription graveyard",
-  "Bills > chills > skills",
-  "Restart life.exe failed",
-  "You had one job: renew"
-];
-
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // --------------------------- Providers -------------------------------------
 // Each returns: { name, premium: true|false|null, daysLeft, untilISO, username?, note? }
@@ -616,62 +463,52 @@ async function pDebridLink({
   }
 }
 
-// --------------------------- Rendering -------------------------------------
-function statusInfo(days) {
-  if (days <= 0) return { mark: "🔴 Status: Expired", bucket: QUOTES_EXPIRED };
-  if (days <= 3) return { mark: "🟠 Status: Critical", bucket: QUOTES_CRIT };
-  if (days <= 14) return { mark: "🟡 Status: Warning", bucket: QUOTES_WARN };
-  return { mark: "🟢 Status: OK", bucket: QUOTES_OK };
+// --------------------------- Status + rendering ----------------------------
+
+function statusWord(days) {
+  if (days <= 0) return "Expired";
+  if (days <= 3) return "Critical";
+  if (days <= 14) return "Warning";
+  return "OK";
 }
 
-function renderProviderCard(r) {
-  const service = r.name;
-  const user = r?.username ? `@${String(r.username)}` : "—";
+// Make a very simple card like the screenshot
+function renderBareCard(result) {
+  const service = result.name;
+  const username = result?.username ? String(result.username) : "N/A";
+
   const days =
-    Number.isFinite(r.daysLeft) && r.daysLeft !== null
-      ? r.daysLeft
-      : r.premium
+    Number.isFinite(result.daysLeft) && result.daysLeft !== null
+      ? result.daysLeft
+      : result.premium
       ? "—"
       : 0;
-  const dateStr = r.untilISO ? isoDate(r.untilISO) : r.premium ? "—" : "N/A";
 
-  const numericDays = typeof days === "number" ? days : 9999;
-  const { mark, bucket } = statusInfo(numericDays);
-  const quote = pick(bucket);
+  const numericDays = typeof days === "number" ? days : 0;
+  const dateStr = result.untilISO ? isoDate(result.untilISO) : "N/A";
 
-  let titlePrefix = "🟢 OK";
-  if (mark.startsWith("🟡")) titlePrefix = "🟡 Warning";
-  else if (mark.startsWith("🟠")) titlePrefix = "🟠 Critical";
-  else if (mark.startsWith("🔴")) titlePrefix = "🔴 Expired";
+  const word = statusWord(numericDays);
 
-  const title = `${titlePrefix} — ${service}`;
+  const title = `${service}: ${word}`;
+  const descriptionLines = [
+    `User: ${username}`,
+    `Expires: ${dateStr}`,
+    `Days left: ${numericDays}`
+  ];
 
-  const lines = [
-    LINE,
-    `🤝 Service: ${service}`,
-    `👤 ${user}`,
-    `⭐ Premium until: ${dateStr}`,
-    `⏳ Days remaining: ${days} D`,
-    `${mark}`,
-    `💬 ${quote}`,
-    LINE
-  ].join("\n");
-
-  return { title, description: lines };
+  return {
+    title,
+    description: descriptionLines.join("\n")
+  };
 }
 
-// --------------------------- External URL Builder ---------------------------
-// Build externalUrl per provider; if missing, pick the first present by priority.
-// We *use it only as our stream.url* in v1.1.12 (no externalUrl field) so TV
-// clients only see a single URL field.
+// Build a simple external link (used only as URL)
 function buildExternalUrl(result, tokens) {
   try {
-    // If we know the provider, use its homepage
     if (result?.name && PROVIDER_URL[result.name]) {
       return PROVIDER_URL[result.name];
     }
 
-    // Otherwise pick first enabled by priority
     for (const prov of PROVIDER_PRIORITY) {
       if (
         (prov === "Real-Debrid" && tokens.rd) ||
@@ -684,29 +521,18 @@ function buildExternalUrl(result, tokens) {
       }
     }
 
-    // Last-resort: hosted UI with some encoded params
-    const base = new URL(STATUS_BASE_URL);
-    base.pathname = "/status";
-    if (result?.name) base.searchParams.set("provider", result.name);
-    if (result?.username)
-      base.searchParams.set("user", String(result.username));
-    if (Number.isFinite(result?.daysLeft))
-      base.searchParams.set("days", String(result.daysLeft));
-    if (typeof result?.premium === "boolean")
-      base.searchParams.set("premium", result.premium ? "1" : "0");
-    if (result?.untilISO) base.searchParams.set("until", result.untilISO);
-    return base.toString();
+    return STATUS_BASE_URL;
   } catch (e) {
-    console.warn("[Statusio] Failed to build externalUrl:", e.message);
+    console.warn("[Statusio] Failed to build URL:", e.message);
     return STATUS_BASE_URL;
   }
 }
 
 // --------------------------- Manifest & Config ------------------------------
-// v1.1.12 — experiment: only `url` (no externalUrl) + no notWebReady
+// v1.1.13 — Bare-bones layout for TV clients
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.12",
+  version: "1.1.13",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -721,9 +547,8 @@ const manifest = {
   idPrefixes: ["tt"],
   catalogs: [],
   behaviorHints: { configurable: true, configurationRequired: false },
-  logo: LOGO_URL,
+  logo: LOGO_DATA_URL,
 
-  // Configurable fields (per docs: use "key")
   config: [
     {
       key: "cache_minutes",
@@ -732,7 +557,6 @@ const manifest = {
       title: "Cache Minutes (default 45)"
     },
 
-    // Tokens / keys – presence = enabled
     { key: "rd_token", type: "text", title: "Real-Debrid Token (Bearer)" },
     { key: "ad_key", type: "text", title: "AllDebrid API Key (Bearer)" },
     {
@@ -743,7 +567,6 @@ const manifest = {
     { key: "tb_token", type: "text", title: "TorBox Token (Bearer)" },
     { key: "dl_key", type: "text", title: "Debrid-Link API Key/Token" },
 
-    // Debrid-Link auth/endpoint
     {
       key: "dl_auth",
       type: "text",
@@ -763,7 +586,6 @@ const builder = new addonBuilder(manifest);
 
 // ---------------------------- Stream Handler -------------------------------
 builder.defineStreamHandler(async (args) => {
-  // Quick filter: we only target Cinemeta items with tt IDs
   const reqType = String(args?.type || "");
   const reqId = String(args?.id || "");
   console.log("[Statusio] stream request:", { type: reqType, id: reqId });
@@ -771,7 +593,6 @@ builder.defineStreamHandler(async (args) => {
     return { streams: [] };
   }
 
-  // raw config from Stremio – may be an object OR a JSON string
   const rawCfg = args?.config ?? {};
   let cfg = {};
   if (typeof rawCfg === "string") {
@@ -791,7 +612,6 @@ builder.defineStreamHandler(async (args) => {
     ? Math.max(1, Number(cfg.cache_minutes))
     : 45;
 
-  // Prefer config values; env vars only as fallback for dev
   const tokens = {
     rd: String(cfg.rd_token || process.env.RD_TOKEN || "").trim(),
     ad: String(cfg.ad_key || process.env.AD_KEY || "").trim(),
@@ -819,9 +639,7 @@ builder.defineStreamHandler(async (args) => {
     `ad:${redact(tokens.ad)}`,
     `pm:${redact(tokens.pm)}`,
     `tb:${redact(tokens.tb)}`,
-    `dl:${redact(tokens.dl)}:${cfg.dl_auth || "Bearer"}:${
-      cfg.dl_endpoint || ""
-    }`
+    `dl:${redact(tokens.dl)}:${cfg.dl_auth || "Bearer"}:${cfg.dl_endpoint || ""}`
   ].join("|");
 
   let results = getCache(cacheKey);
@@ -846,33 +664,23 @@ builder.defineStreamHandler(async (args) => {
             key: tokens.dl,
             authScheme: cfg.dl_auth || "Bearer",
             endpoint:
-              (cfg.dl_endpoint || "https://debrid-link.com/api/account/infos")
-                .trim()
+              (cfg.dl_endpoint || "https://debrid-link.com/api/account/infos").trim()
           })
         );
 
       results = jobs.length ? await Promise.all(jobs) : [];
       setCache(cacheKey, results, cacheMin * MIN);
     } catch (e) {
-      const lines = [
-        LINE,
-        "⚠️ Unable to fetch debrid status",
-        String(e.message || e),
-        LINE
-      ].join("\n");
-
       const fallbackLink = STATUS_BASE_URL;
+      const desc = `Unable to fetch debrid status:\n${String(e.message || e)}`;
 
       return {
         streams: [
           {
-            name: "🔐 Statusio",
-            title: "⚠️ Status unavailable",
-            description: lines,
-            url: fallbackLink,
-            behaviorHints: {
-              bingeGroup: "statusio-info"
-            }
+            name: "Statusio",
+            title: "Status unavailable",
+            description: desc,
+            url: fallbackLink
           }
         ],
         cacheMaxAge: 60
@@ -882,17 +690,14 @@ builder.defineStreamHandler(async (args) => {
 
   const streams = [];
   for (const r of results) {
-    const card = renderProviderCard(r);
+    const card = renderBareCard(r);
     const link = buildExternalUrl(r, tokens);
 
     streams.push({
-      name: "🔐 Statusio",
+      name: "Statusio",
       title: card.title,
       description: card.description,
-      url: link,
-      behaviorHints: {
-        bingeGroup: "statusio-info"
-      }
+      url: link
     });
   }
 
@@ -902,44 +707,24 @@ builder.defineStreamHandler(async (args) => {
 
     if (!hasAnyCfg) {
       streams.push({
-        name: "🔐 Statusio",
-        title: "⚠️ Add a token in Configure",
-        description: [
-          LINE,
-          "Add at least one token in Configure:",
-          "• Real-Debrid (rd_token)",
-          "• AllDebrid (ad_key)",
-          "• Premiumize (pm_key)",
-          "• TorBox (tb_token)",
-          "• Debrid-Link (dl_key)",
-          LINE
-        ].join("\n"),
-        url: fallbackLink,
-        behaviorHints: {
-          bingeGroup: "statusio-info"
-        }
+        name: "Statusio",
+        title: "No providers configured",
+        description:
+          "Add at least one token in Configure:\nReal-Debrid, AllDebrid, Premiumize, TorBox or Debrid-Link.",
+        url: fallbackLink
       });
     } else {
       streams.push({
-        name: "🔐 Statusio",
-        title: "⚠️ Config received but no providers enabled",
+        name: "Statusio",
+        title: "Config received but no providers enabled",
         description: [
-          LINE,
-          "We received config from Stremio, but no provider token is enabled.",
-          "",
           `Real-Debrid:   ${redact(tokens.rd)}`,
           `AllDebrid:     ${redact(tokens.ad)}`,
           `Premiumize:    ${redact(tokens.pm)}`,
           `TorBox:        ${redact(tokens.tb)}`,
-          `Debrid-Link:   ${redact(tokens.dl)}`,
-          "",
-          "Check that your tokens are valid and saved in Configure.",
-          LINE
+          `Debrid-Link:   ${redact(tokens.dl)}`
         ].join("\n"),
-        url: fallbackLink,
-        behaviorHints: {
-          bingeGroup: "statusio-info"
-        }
+        url: fallbackLink
       });
     }
   }

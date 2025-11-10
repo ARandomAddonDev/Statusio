@@ -1,7 +1,6 @@
 // ============================================================================
-// Statusio • Stremio Add-on (TV-Compatible Baseline v1.1.18)
-// EXACTLY matches the proven Ratings Aggregator–style pattern for TVs
-// + small UX: per-provider homepage URL
+// Statusio • Stremio Add-on (TV-Compatible v1.1.19)
+// Single stream, multi-service status in one clean card
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -53,23 +52,6 @@ const getCache = (key) => {
   }
   return it.value;
 };
-
-// ---------------------- Provider homepage mapping --------------------------
-const PROVIDER_URL = {
-  "Real-Debrid": "https://real-debrid.com/",
-  AllDebrid: "https://alldebrid.com/",
-  Premiumize: "https://www.premiumize.me/",
-  TorBox: "https://torbox.app/",
-  "Debrid-Link": "https://debrid-link.com/",
-};
-
-function providerUrlFor(result) {
-  if (result?.name && PROVIDER_URL[result.name]) {
-    return PROVIDER_URL[result.name];
-  }
-  // Fallback: Real-Debrid homepage as a safe default
-  return "https://real-debrid.com/";
-}
 
 // --------------------------- Providers -------------------------------------
 async function pRealDebrid({ token, fetchImpl = fetch }) {
@@ -474,33 +456,56 @@ function getStatusInfo(days) {
   return { emoji: "🟢", status: "OK" };
 }
 
-// SIMPLE text like Ratings Aggregator
-function formatProviderStatus(r) {
-  const user = r?.username ? `@${String(r.username)}` : "—";
-  const days =
-    Number.isFinite(r.daysLeft) && r.daysLeft !== null
-      ? r.daysLeft
-      : r.premium
-      ? "—"
-      : 0;
-  const dateStr = r.untilISO ? isoDate(r.untilISO) : r.premium ? "—" : "N/A";
+// Build the single-card multi-service description
+function buildMultiServiceDescription(results) {
+  const providerLines = [];
+  let primaryInfo = null;
 
-  const numericDays = typeof days === "number" ? days : 9999;
-  const { emoji, status } = getStatusInfo(numericDays);
+  for (const r of results) {
+    if (!(r.premium !== null || r.username)) continue;
 
-  return (
-    `${emoji} ${r.name}: ${status}\n` +
-    `👤 User: ${user}\n` +
-    `⏳️ Expires: ${dateStr}\n` +
-    `📅 Days left: ${days}` +
-    (r.note ? `\nNote: ${r.note}` : "")
-  );
+    const rawDays =
+      Number.isFinite(r.daysLeft) && r.daysLeft !== null
+        ? r.daysLeft
+        : r.premium
+        ? "—"
+        : 0;
+    const numericDays = typeof rawDays === "number" ? rawDays : 9999;
+    const { emoji, status } = getStatusInfo(numericDays);
+
+    const prefix = primaryInfo ? "🛠️" : "🤝";
+    providerLines.push(
+      `${prefix} Service: ${r.name} - ${status} ${emoji}`
+    );
+
+    if (!primaryInfo) {
+      const user = r?.username ? `@${String(r.username)}` : "—";
+      const dateStr = r.untilISO ? isoDate(r.untilISO) : r.premium ? "—" : "N/A";
+      primaryInfo = {
+        user,
+        dateStr,
+        daysDisplay: rawDays,
+      };
+    }
+  }
+
+  if (!primaryInfo) {
+    return null;
+  }
+
+  const footerLines = [
+    `👤 User: ${primaryInfo.user}`,
+    `⏳️ Expires: ${primaryInfo.dateStr}`,
+    `📅 Days left: ${primaryInfo.daysDisplay}`,
+  ];
+
+  return [...providerLines, ...footerLines].join("\n");
 }
 
 // --------------------------- Manifest (TV-Compatible) ----------------------
 const manifest = {
   id: "a1337user.statusio.tv.compatible",
-  version: "1.1.18",
+  version: "1.1.19",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -617,7 +622,7 @@ builder.defineStreamHandler(async (args) => {
   const reqType = String(args?.type || "");
   const reqId = String(args?.id || "");
 
-  console.log("[Statusio v1.1.18] TV stream request:", { type: reqType, id: reqId });
+  console.log("[Statusio v1.1.19] TV stream request:", { type: reqType, id: reqId });
 
   if (!reqId || !reqId.startsWith("tt")) {
     return { streams: [] };
@@ -636,45 +641,44 @@ builder.defineStreamHandler(async (args) => {
     cfg = rawCfg;
   }
 
-  console.log("[Statusio v1.1.18 parsed config]", JSON.stringify(cfg, null, 2));
+  console.log("[Statusio v1.1.19 parsed config]", JSON.stringify(cfg, null, 2));
 
   const statusData = await fetchStatusData(cfg);
 
   // If no providers configured, return empty (TVs skip setup/instructional stuff)
   if (!Object.values(statusData.enabled).some((v) => v)) {
-    console.log("[Statusio v1.1.18] No providers enabled, returning empty for TV");
+    console.log("[Statusio v1.1.19] No providers enabled, returning empty for TV");
     return { streams: [] };
   }
 
-  const streams = [];
-
-  // Create TV-compatible streams - SIMPLE like Ratings Aggregator
-  if (statusData.hasData) {
-    for (const r of statusData.results) {
-      if (r.premium !== null || r.username) {
-        const link = providerUrlFor(r);
-
-        streams.push({
-          name: "🔐 Statusio", // Fixed name like "🎯 Ratings Aggregator"
-          description: formatProviderStatus(r),
-          // CRITICAL: include url + externalUrl
-          url: link,
-          externalUrl: link,
-          behaviorHints: {
-            notWebReady: true,
-          },
-        });
-      }
-    }
+  if (!statusData.hasData) {
+    console.log("[Statusio v1.1.19] No usable data from providers");
+    return { streams: [] };
   }
 
-  // If multiple providers, only return ONE stream to avoid TV issues
-  const finalStreams = streams.length > 0 ? [streams[0]] : [];
+  const description = buildMultiServiceDescription(statusData.results);
+  if (!description) {
+    console.log("[Statusio v1.1.19] Could not build description, returning empty");
+    return { streams: [] };
+  }
+
+  const streams = [
+    {
+      name: "🔐 Statusio",
+      description,
+      // Keep URL pattern TV-safe: simple, non-setup external site
+      url: "https://real-debrid.com/",
+      externalUrl: "https://real-debrid.com/",
+      behaviorHints: {
+        notWebReady: true,
+      },
+    },
+  ];
 
   console.log(
-    `[Statusio v1.1.18] Returning ${finalStreams.length} TV-compatible streams`
+    `[Statusio v1.1.19] Returning ${streams.length} TV-compatible stream(s)`
   );
-  return { streams: finalStreams };
+  return { streams };
 });
 
 // ------------------------------ Server -------------------------------------
@@ -682,6 +686,6 @@ const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
 console.log(
-  `✅ Statusio TV Baseline v1.1.18 at http://127.0.0.1:${PORT}/manifest.json`
+  `✅ Statusio TV v1.1.19 at http://127.0.0.1:${PORT}/manifest.json`
 );
-console.log(`📱 Uses proven Ratings Aggregator TV pattern`);
+console.log(`📱 Single-card multi-service status for TVs`);

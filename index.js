@@ -1,6 +1,7 @@
 // ============================================================================
-// Statusio • Stremio Add-on (TV-Compatible Baseline v1.1.17)
+// Statusio • Stremio Add-on (TV-Compatible Baseline v1.1.18)
 // EXACTLY matches the proven Ratings Aggregator–style pattern for TVs
+// + small UX: per-provider homepage URL
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -52,6 +53,23 @@ const getCache = (key) => {
   }
   return it.value;
 };
+
+// ---------------------- Provider homepage mapping --------------------------
+const PROVIDER_URL = {
+  "Real-Debrid": "https://real-debrid.com/",
+  AllDebrid: "https://alldebrid.com/",
+  Premiumize: "https://www.premiumize.me/",
+  TorBox: "https://torbox.app/",
+  "Debrid-Link": "https://debrid-link.com/",
+};
+
+function providerUrlFor(result) {
+  if (result?.name && PROVIDER_URL[result.name]) {
+    return PROVIDER_URL[result.name];
+  }
+  // Fallback: Real-Debrid homepage as a safe default
+  return "https://real-debrid.com/";
+}
 
 // --------------------------- Providers -------------------------------------
 async function pRealDebrid({ token, fetchImpl = fetch }) {
@@ -472,9 +490,9 @@ function formatProviderStatus(r) {
 
   return (
     `${emoji} ${r.name}: ${status}\n` +
-    `User: ${user}\n` +
-    `Expires: ${dateStr}\n` +
-    `Days left: ${days}` +
+    `👤 User: ${user}\n` +
+    `⏳️ Expires: ${dateStr}\n` +
+    `📅 Days left: ${days}` +
     (r.note ? `\nNote: ${r.note}` : "")
   );
 }
@@ -482,7 +500,7 @@ function formatProviderStatus(r) {
 // --------------------------- Manifest (TV-Compatible) ----------------------
 const manifest = {
   id: "a1337user.statusio.tv.compatible",
-  version: "1.1.17",
+  version: "1.1.18",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -599,7 +617,7 @@ builder.defineStreamHandler(async (args) => {
   const reqType = String(args?.type || "");
   const reqId = String(args?.id || "");
 
-  console.log("[Statusio v1.1.17] TV stream request:", { type: reqType, id: reqId });
+  console.log("[Statusio v1.1.18] TV stream request:", { type: reqType, id: reqId });
 
   if (!reqId || !reqId.startsWith("tt")) {
     return { streams: [] };
@@ -618,13 +636,13 @@ builder.defineStreamHandler(async (args) => {
     cfg = rawCfg;
   }
 
-  console.log("[Statusio v1.1.17 parsed config]", JSON.stringify(cfg, null, 2));
+  console.log("[Statusio v1.1.18 parsed config]", JSON.stringify(cfg, null, 2));
 
   const statusData = await fetchStatusData(cfg);
 
   // If no providers configured, return empty (TVs skip setup/instructional stuff)
   if (!Object.values(statusData.enabled).some((v) => v)) {
-    console.log("[Statusio v1.1.17] No providers enabled, returning empty for TV");
+    console.log("[Statusio v1.1.18] No providers enabled, returning empty for TV");
     return { streams: [] };
   }
 
@@ -634,12 +652,14 @@ builder.defineStreamHandler(async (args) => {
   if (statusData.hasData) {
     for (const r of statusData.results) {
       if (r.premium !== null || r.username) {
+        const link = providerUrlFor(r);
+
         streams.push({
           name: "🔐 Statusio", // Fixed name like "🎯 Ratings Aggregator"
           description: formatProviderStatus(r),
           // CRITICAL: include url + externalUrl
-          url: "https://real-debrid.com/",
-          externalUrl: "https://real-debrid.com/",
+          url: link,
+          externalUrl: link,
           behaviorHints: {
             notWebReady: true,
           },
@@ -652,7 +672,7 @@ builder.defineStreamHandler(async (args) => {
   const finalStreams = streams.length > 0 ? [streams[0]] : [];
 
   console.log(
-    `[Statusio v1.1.17] Returning ${finalStreams.length} TV-compatible streams`
+    `[Statusio v1.1.18] Returning ${finalStreams.length} TV-compatible streams`
   );
   return { streams: finalStreams };
 });
@@ -662,6 +682,6 @@ const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
 console.log(
-  `✅ Statusio TV Baseline v1.1.17 at http://127.0.0.1:${PORT}/manifest.json`
+  `✅ Statusio TV Baseline v1.1.18 at http://127.0.0.1:${PORT}/manifest.json`
 );
 console.log(`📱 Uses proven Ratings Aggregator TV pattern`);

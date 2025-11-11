@@ -1,5 +1,5 @@
 // ============================================================================
-// Statusio • Stremio Add-on (TV-Compatible v1.1.23)
+// Statusio • Stremio Add-on (TV-Compatible v1.1.24)
 // Change: restore \n line breaks and show one card per enabled service (capped)
 // Pattern: Ratings Aggregator–style (simple text, includes url + externalUrl)
 // ============================================================================
@@ -489,5 +489,5 @@ builder.defineStreamHandler(async (args) => {
 const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
-console.log(`✅ Statusio TV v1.1.23 at http://127.0.0.1:${PORT}/manifest.json`);
+console.log(`✅ Statusio TV v1.1.24 at http://127.0.0.1:${PORT}/manifest.json`);
 console.log(`↩️  Using \\n line breaks and per-service cards (capped).`);
